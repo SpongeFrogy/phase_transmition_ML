@@ -2,5 +2,6 @@
 /data
 /qmof_datasets
 /catboost_info
+/reduce_feature
 .vscode
 *.csv
