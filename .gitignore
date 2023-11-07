@@ -1,0 +1,6 @@
+/main_datasets
+/data
+/qmof_datasets
+/catboost_info
+.vscode
+*.csv
