@@ -33,7 +33,7 @@ class Boosting:
         pass
 
 
-class Classifier:
+class GBoosts:
     clf_dict = {"CatBoost": CatBoostClassifier(),
                 "LGM": LGBMClassifier(),
                 "XGB": XGBClassifier(),
@@ -54,7 +54,7 @@ class Classifier:
     h_space_clf = {"CatBoost": {"depth": hp.uniformint("depth", 4, 10),
                                 "n_estimators": hp.uniformint("n_estimators", 40, 100),
                                 "learning_rate": hp.uniform("learning_rate", 1e-7, 1e-2),
-                                "l2_leaf_reg" : hp.uniform("l2_leaf_reg", 0.1, 1),
+                                "l2_leaf_reg" : hp.uniform("l2_leaf_reg", 0.1, 10),
                                 },
                    # url https://lightgbm.readthedocs.io/en/latest/Parameters-Tuning.html
                    "LGM": {}}
