@@ -9,7 +9,6 @@ from pandas import DataFrame
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import balanced_accuracy_score
-from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
 from sklearn.preprocessing import StandardScaler, RobustScaler
