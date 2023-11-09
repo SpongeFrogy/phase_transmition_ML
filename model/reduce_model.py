@@ -16,6 +16,7 @@ from sklearn.decomposition import PCA
 
 from tqdm import tqdm
 
+
 class TrainError(Exception):
     "encoder in ReduceModel isn't trained yet"
     pass
@@ -123,7 +124,6 @@ class AE(nn.Module):
 
             train_loss /= train_loader.__len__()
 
-            
             train_loss_list.append(train_loss)
 
             # Validation loop
@@ -154,7 +154,7 @@ class AE(nn.Module):
                     # plt.show()
 
                 val_loss /= len(val_loader)
-                
+
                 test_loss_list.append(val_loss)
 
         train_results = {"model": "AE",
@@ -167,7 +167,7 @@ class AE(nn.Module):
                          "test_loss": test_loss_list[-1],
                          "train_loss_list": train_loss_list,
                          "test_loss_list": test_loss_list}
-        
+
         print(f'Epoch {epochs}, Train Loss: {train_loss_list[-1]}')
         print(f'Epoch {epochs}, Validation Loss: {test_loss_list[-1]}')
 

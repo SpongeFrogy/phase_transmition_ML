@@ -26,6 +26,8 @@ from sklearn import metrics
 
 import numpy as np
 
+class TrainError(Exception):
+    "if models are nor fitted"
 
 class AdaBoostClf(AdaBoostClassifier):
     def __init__(self, max_depth: int = 4, *, n_estimators: int = 50, learning_rate: float = 1, algorithm: Literal['SAMME', 'SAMME.R'] = "SAMME.R", random_state: int | RandomState | None = None, base_estimator: Any = "deprecated") -> None:
@@ -50,12 +52,12 @@ class AdaBoostClf(AdaBoostClassifier):
 
 
 class ClassifierModel:
-    clf_dict = {  "CatBoost": CatBoostClassifier(random_seed=42, silent=True),
-        "LGM": LGBMClassifier(random_seed=42),
-        "XGB": XGBClassifier(),
-        "RF": RandomForestClassifier(random_state=42),
-        "AdaBoost": AdaBoostClf(random_state=42)
-    }
+    clf_dict = {"CatBoost": CatBoostClassifier(random_seed=42, silent=True),
+                "LGM": LGBMClassifier(random_seed=42),
+                "XGB": XGBClassifier(),
+                "RF": RandomForestClassifier(random_state=42),
+                "AdaBoost": AdaBoostClf(random_state=42)
+                }
 
     h_space_clf = {"CatBoost": {"depth": hp.uniformint("depth", 2, 10),
                                 "n_estimators": hp.uniformint("n_estimators", 40, 100),
@@ -90,24 +92,46 @@ class ClassifierModel:
         self.models: Dict[str, object] = deepcopy(self.clf_dict)
 
     def fit(self, x: Union[ndarray, DataFrame], y: Union[ndarray, DataFrame]) -> None:
+        """fit each classifier 
+
+        Args:
+            x (Union[ndarray, DataFrame]): x train
+            y (Union[ndarray, DataFrame]): y train
+        """
         for clf in self.models.values():
             clf.fit(x, y)
         self.fitted = True
 
-    def predict(self, X_test: Union[ndarray, DataFrame]) -> ndarray:
-        if not self.fitted:
-            raise ValueError("isn't fitted yet")
-
-    def cv(self, X_train: Union[ndarray, DataFrame], y_train: DataFrame, time_per_clf: int = 10) -> None:
-        """_summary_
+    def predict(self, X_test: Union[ndarray, DataFrame]) -> dict[str, ndarray]:
+        """predict for each classifier
 
         Args:
-            X_train (Union[ndarray, DataFrame]): _description_
-            y_train (DataFrame): _description_
-            time_per_clf (int, optional): _description_. Defaults to 10.
+            X_test (Union[ndarray, DataFrame]): x for prediction
+
+        Raises:
+            TrainError: if models are not fitted 
 
         Returns:
-            _type_: _description_
+            dict[str, ndarray]: prediction for each classifier
+        """
+        if not self.fitted:
+            raise TrainError("isn't fitted yet")
+        res = {name : self.models[name].predict(X_test) for name in self.models}
+        return res
+
+    def cv(self, X_train: DataFrame, y_train: DataFrame, time_per_clf: int = 10) -> dict[str, dict[str, int | float]]:
+        """method for cross validation with StratifiedKFold:
+            - split X_train, y_train into 5 folds
+            - optimize every classifier in their oun hyperparameter space with f1 macro score function 
+            - result optimal params for each classifier are best of folds (with best score) 
+
+        Args:
+            X_train (DataFrame): X values for cv
+            y_train (DataFrame): y values for cv
+            time_per_clf (int, optional): time of optimization one classifier on one split, result time: time_per_clf*5(folds)*5(classification model). Defaults to 10.
+
+        Returns:
+            dict[str, dict[str, int | float]]: result of optimization
         """
         skf = StratifiedKFold(shuffle=True, random_state=42)
 
@@ -151,6 +175,11 @@ class ClassifierModel:
         return cv_res
 
     def set_params(self, params: dict[str, dict]) -> None:
+        """set params for each classifier
+
+        Args:
+            params (dict[str, dict]): params to be setted
+        """
         for name in self.models:
             self.models[name].set_params(**params[name])
 
