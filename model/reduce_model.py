@@ -293,7 +293,7 @@ class VAE(nn.Module):
             train_loss /= train_loader.__len__()
 
             print(f'Epoch {epoch+1}, Train Loss: {train_loss}')
-            train_loss_list.append(train_loss)
+            train_loss_list[epoch] = train_loss
 
             # Validation loop
             val_loss = 0.
@@ -324,7 +324,7 @@ class VAE(nn.Module):
 
                 val_loss /= len(val_loader)
                 print(f'Epoch {epoch+1}, Validation Loss: {val_loss}')
-                test_loss_list.append(val_loss)
+                test_loss_list[epoch] = val_loss
 
         train_results = {"model": "AE",
                          "epochs": epochs,
