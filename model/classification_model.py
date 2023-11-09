@@ -1,3 +1,4 @@
+from itertools import count
 from typing import Any, Dict, Literal, Union
 
 from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
@@ -17,9 +18,8 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.tree import DecisionTreeClassifier
 
 import hyperopt
-from hyperopt import hp, fmin, tpe
+from hyperopt import hp, fmin, tpe, STATUS_OK, space_eval
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
-
 from copy import deepcopy
 
 from sklearn import metrics
@@ -50,12 +50,12 @@ class AdaBoostClf(AdaBoostClassifier):
 
 
 class ClassifierModel:
-    clf_dict = {"CatBoost": CatBoostClassifier(random_seed=42, silent=True),
-                "LGM": LGBMClassifier(random_seed=42),
-                "XGB": XGBClassifier(),
-                "RF": RandomForestClassifier(random_state=42),
-                "AdaBoost": AdaBoostClf(random_state=42)
-                }
+    clf_dict = {  "CatBoost": CatBoostClassifier(random_seed=42, silent=True),
+        "LGM": LGBMClassifier(random_seed=42),
+        "XGB": XGBClassifier(),
+        "RF": RandomForestClassifier(random_state=42),
+        "AdaBoost": AdaBoostClf(random_state=42)
+    }
 
     h_space_clf = {"CatBoost": {"depth": hp.uniformint("depth", 2, 10),
                                 "n_estimators": hp.uniformint("n_estimators", 40, 100),
@@ -75,7 +75,7 @@ class ClassifierModel:
                                 "reg_lambda": hp.uniform("reg_lambda", 0.01, 10),
                                 },
 
-                   "RF":       {"max_depth": hp.choice('max_depth', list(range(10, 30+1))),
+                   "RF":       {"max_depth": hp.choice('max_depth', np.arange(10, 100+1, dtype=int)),
                                 "n_estimators":  hp.choice('n_estimators', list(range(40, 100+1))),
                                 },
 
@@ -98,20 +98,39 @@ class ClassifierModel:
         if not self.fitted:
             raise ValueError("isn't fitted yet")
 
-    def cv(self, X_train: Union[ndarray, DataFrame], y_train: DataFrame) -> None:
+    def cv(self, X_train: Union[ndarray, DataFrame], y_train: DataFrame, time_per_clf: int = 10) -> None:
+        """_summary_
+
+        Args:
+            X_train (Union[ndarray, DataFrame]): _description_
+            y_train (DataFrame): _description_
+            time_per_clf (int, optional): _description_. Defaults to 10.
+
+        Returns:
+            _type_: _description_
+        """
         skf = StratifiedKFold(shuffle=True, random_state=42)
 
         x_cv_train, y_cv_train = None, None
         cv_res = {clf_name: {"score": 0} for clf_name in self.models}
 
         for clf_name in self.models:
+            print(f"evaluate {clf_name}")
             for i, (train_index, test_index) in enumerate(skf.split(X_train, y_train)):
-                x_cv_train, y_cv_train = X_train.iloc[train_index], y_train.iloc[train_index].values.ravel()
-                x_cv_test, y_cv_test = X_train.iloc[test_index], y_train.iloc[test_index].values.ravel()
-                clf_model = deepcopy(self.models[clf_name])
+                x_cv_train, y_cv_train = X_train.iloc[train_index], y_train.iloc[train_index].values.ravel(
+                )
+                x_cv_test, y_cv_test = X_train.iloc[test_index], y_train.iloc[test_index].values.ravel(
+                )
+                clf_model = self.models[clf_name]
+                balance = {"test": {},
+                           "train": {}}
+                for value, count in zip(*np.unique(y_cv_test, return_counts=True)):
+                    balance["test"][str(value)] = count
+
+                for value, count in zip(*np.unique(y_cv_train, return_counts=True)):
+                    balance["train"][str(value)] = count
 
                 def hyperopt_objective(params):
-                    # print(params)
                     _model = deepcopy(clf_model).set_params(**params)
                     _model.fit(x_cv_train, y_cv_train)
                     y_cv_pred = _model.predict(x_cv_test)
@@ -121,14 +140,19 @@ class ClassifierModel:
                     return -m_value
 
                 best = fmin(
-                    hyperopt_objective, space=self.h_space_clf[clf_name], algo=tpe.suggest, timeout=2)
+                    hyperopt_objective, space=self.h_space_clf[clf_name], algo=tpe.suggest, timeout=time_per_clf, return_argmin=False)
                 score = -hyperopt_objective(best)
-                print(cv_res)
+
                 if score > cv_res[clf_name]["score"]:
                     cv_res[clf_name] = best
                     cv_res[clf_name]["score"] = score
+                    cv_res[clf_name]["balance"] = balance
 
         return cv_res
+
+    def set_params(self, params: dict[str, dict]) -> None:
+        for name in self.models:
+            self.models[name].set_params(**params[name])
 
 
 if __name__ == "__main__":
