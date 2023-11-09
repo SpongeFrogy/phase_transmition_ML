@@ -26,8 +26,10 @@ from sklearn import metrics
 
 import numpy as np
 
+
 class TrainError(Exception):
     "if models are nor fitted"
+
 
 class AdaBoostClf(AdaBoostClassifier):
     def __init__(self, max_depth: int = 4, *, n_estimators: int = 50, learning_rate: float = 1, algorithm: Literal['SAMME', 'SAMME.R'] = "SAMME.R", random_state: int | RandomState | None = None, base_estimator: Any = "deprecated") -> None:
@@ -116,7 +118,7 @@ class ClassifierModel:
         """
         if not self.fitted:
             raise TrainError("isn't fitted yet")
-        res = {name : self.models[name].predict(X_test) for name in self.models}
+        res = {name: self.models[name].predict(X_test) for name in self.models}
         return res
 
     def cv(self, X_train: DataFrame, y_train: DataFrame, time_per_clf: int = 10) -> dict[str, dict[str, int | float]]:
@@ -128,7 +130,7 @@ class ClassifierModel:
         Args:
             X_train (DataFrame): X values for cv
             y_train (DataFrame): y values for cv
-            time_per_clf (int, optional): time of optimization one classifier on one split, result time: time_per_clf*5(folds)*5(classification model). Defaults to 10.
+            time_per_clf (int, optional): time of optimization one classifier on one split, result time: time_per_clf*25(folds*classification model). Defaults to 10.
 
         Returns:
             dict[str, dict[str, int | float]]: result of optimization

@@ -40,19 +40,17 @@ def RMSE(y_recon, y):
 
 
 "standard layers: 1378, 702, 351, 176, 88, 44, 22, 11, 5"
-
-
 class AE(nn.Module):
     losses = {
         "MSE": nn.MSELoss(),
         "RMSE": RMSE
     }
 
-    def __init__(self, layers: Tuple[int] = (1378, 702, 351, 176, 88, 44, 22, 11, 5), last_activation: Callable = nn.LeakyReLU()):
+    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5), last_activation: Callable = nn.LeakyReLU()):
         """AE model
 
         Args:
-            layers (Tuple[int], optional): sizes of layers. Defaults to (1378, 702, 351, 176, 88, 44, 22, 11, 5).
+            layers (Tuple[int], optional): sizes of layers. Defaults to (1145, 572, 286, 143, 72, 36, 18, 9, 5).
             last_activation (Callable, optional): last activation function for decoder. Defaults to nn.LeakyReLU().
         """
 
@@ -200,11 +198,11 @@ class VAE(nn.Module):
     def KLD(cls, mu, logvar, beta=0.5):
         return - beta * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
-    def __init__(self, layers: Tuple[int] = (1378, 702, 351, 176, 88, 44, 22, 11, 5), last_activation: Callable = nn.LeakyReLU()):
+    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 55), last_activation: Callable = nn.LeakyReLU()):
         """VAE model
 
         Args:
-            layers (Tuple[int], optional): sizes of layers. Defaults to (1378, 702, 351, 176, 88, 44, 22, 11, 5).
+            layers (Tuple[int], optional): sizes of layers. Defaults to (1145, 572, 286, 143, 72, 36, 18, 9, 55).
             last_activation (Callable, optional): last activation function for decoder. Defaults to nn.LeakyReLU().
         """
         super(VAE, self).__init__()
