@@ -1,7 +1,6 @@
 from itertools import count
 from typing import Any, Dict, Literal, Union
 
-from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
 from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
 from numpy import ndarray
@@ -18,7 +17,7 @@ from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.tree import DecisionTreeClassifier
 
 import hyperopt
-from hyperopt import hp, fmin, tpe, STATUS_OK, space_eval
+from hyperopt import hp, fmin, tpe
 from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
 from copy import deepcopy
 
@@ -39,6 +38,8 @@ class AdaBoostClf(AdaBoostClassifier):
 
 
 """
+from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
+
     balance_dict = {"ROS": RandomOverSampler(),
                     "SMOTE": SMOTE(),
                     "ADASYN": ADASYN(),

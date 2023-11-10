@@ -6,5 +6,5 @@
   - [Preprocessing QMOF](preprocessing/cleaning_qmof_data.ipynb)
   - [Preprocessing classification dataset](preprocessing/cleaning_qmof_data.ipynb)
 - [Reduce](model/reduce_model.py) - Autoencoder and Variational Autoencoder models used for reducing number of features
-  - [NOT DONE Reduce analysis](model/reduce_analysis.ipynb)
+  - [Reduce analysis](model/reduce_analysis.ipynb)
 - [Classification model](model/classification_model.py) - model used for classification

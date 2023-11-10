@@ -15,7 +15,7 @@ from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
 from tqdm import tqdm
-
+import os
 
 class TrainError(Exception):
     "encoder in ReduceModel isn't trained yet"
@@ -122,7 +122,7 @@ class AE(nn.Module):
 
             train_loss /= train_loader.__len__()
 
-            train_loss_list.append(train_loss)
+            train_loss_list[epoch] = train_loss
 
             # Validation loop
             val_loss = 0.
@@ -153,7 +153,7 @@ class AE(nn.Module):
 
                 val_loss /= len(val_loader)
 
-                test_loss_list.append(val_loss)
+                test_loss_list[epoch] = val_loss
 
         train_results = {"model": "AE",
                          "epochs": epochs,
@@ -358,8 +358,16 @@ def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[Te
     Returns:
         Tuple[DataLoader, DataLoader]: train and test TensorDatasets 
     """
-    path_train = f"qmof_datasets/{scale}/small_train.csv"
-    path_test = f"qmof_datasets/{scale}/small_test.csv"
+    path = __file__.__str__().split('\\')
+
+    for i in range(len(path)-1, -1, -1):
+        if path[i] == "phase_transmition_ML":
+            break
+        else:
+            path.pop(i)
+    
+    path_train = "/".join(path) + f"/qmof_datasets/{scale}/small_train.csv"
+    path_test = "/".join(path) + f"/qmof_datasets/{scale}/small_test.csv"
     train = TensorDataset(torch.tensor(pd.read_csv(
         path_train, index_col=0).values, dtype=torch.float32))
     test = TensorDataset(torch.tensor(pd.read_csv(
@@ -377,16 +385,18 @@ class ReduceModel:
         if not self.trained:
             raise TrainError("model isn't trained yet")
 
-    def __init__(self, model=AE(layers=(1378, 702, 351, 176, 88, 44, 22, 11, 5))):
-        """
+    def __init__(self, model: Literal["AE", "VAE"] = "AE", **params) -> None:
+        """model for reducing number of features
+
         Args:
-            model (pytorch AE/VAE): model for reduce number of features with
-            methods ._train and ._transform. Defaults to AE(layers=(1378, 702, 351, 176, 88, 44, 22, 11, 5)).
+            model (Literal["AE", "VAE"], optional): neural network model. Defaults to "AE".
+            params are params of nn model class
+
         """
-        super(ReduceModel, self).__init__()
+        
         self.trained = False
         self.device = get_cuda()
-        self.model = model.to(self.device)
+        self.model = AE(**params).to(self.device)
 
     def train(self, epochs: int, lr: float = 1e-3, batch_size: int = 128, loss_func: Literal['MSE', 'RMSE', "BCE"] = "MSE", **kwargs) -> None:
         """train encoder 

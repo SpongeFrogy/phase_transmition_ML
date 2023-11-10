@@ -1,10 +1,10 @@
 from typing import Literal
 from sklearn.preprocessing import MinMaxScaler, Normalizer
+from sklearn.feature_selection import VarianceThreshold
 import pandas as pd
 import numpy as np
 
 from copy import deepcopy
-
 
 
 class NoNormalizerError(Exception):
@@ -45,8 +45,9 @@ class PreprocessingModel:
         if not np.all((transformed_x == transformed_x.dropna()).values):
             raise PreprocessingError("wrong fillna")
 
-    def __init__(self, p_drop: float = 0.05, normalizer: Literal["minmax", "normalizer"] = "normalizer") -> None:
+    def __init__(self, p_drop: float = 0.05, threshold: float = 0.0001, normalizer: Literal["minmax", "normalizer"] = "normalizer") -> None:
         self.p_drop = p_drop
+        self.threshold = threshold
 
         if normalizer not in ("minmax", "normalizer"):
             raise NoNormalizerError("only minmax and norm")
@@ -60,19 +61,28 @@ class PreprocessingModel:
             x_train (pd.DataFrame): x for fit and transform.
         """
 
-        self.cols = [name for name in x_train.columns if not self.do_drop(
-            x_train[name], self.p_drop)]
-        self.index = x_train.index
-        
-        transformed = x_train[self.cols]
+        # drop cols with p_drop*100 % less of missing values
+        transformed = x_train[[name for name in x_train.columns if not self.do_drop(
+            x_train[name], self.p_drop)]]
 
+        # fill missing values with mean of column (axis=1)
         self.means = transformed.mean()
-        transformed = transformed.fillna(self.means)
-        self.check_transforms(transformed)
+        transformed = transformed.fillna(self.means).dropna(axis=1)
 
-        transformed = self.normalizer.fit_transform(transformed)
+        self.check_transforms(transformed) # check if has nan values
 
-        return pd.DataFrame(transformed, columns=self.cols, index = self.index)
+        transformed = pd.DataFrame(self.normalizer.fit_transform(transformed), columns=transformed.columns, index=transformed.index)
+        self.fit_cols = transformed.columns
+
+        # drop columns with varian less than threshold
+        self.selector = VarianceThreshold(threshold=self.threshold)
+        self.selector.fit(transformed)
+        kept = self.selector.get_support() # [True, False, ...] with len = len(x_train)
+        self.cols = transformed.columns[kept] # kept columns after VarianceThreshold
+        transformed = transformed.loc[:, self.cols]
+        self.index = transformed.index
+
+        return pd.DataFrame(transformed, columns=self.cols, index=self.index)
 
     def transform(self, x: pd.DataFrame) -> pd.DataFrame:
         """transform x and y 
@@ -84,13 +94,14 @@ class PreprocessingModel:
             pd.DataFrame: transformed x.
         """
 
-        transformed_x = deepcopy(x[self.cols]).fillna(self.means)
+        transformed_x = x[self.fit_cols].fillna(self.means).dropna(axis=1)
 
         self.check_transforms(transformed_x)
 
-        return pd.DataFrame(self.normalizer.transform(transformed_x), columns=self.cols, index=x.index)
+        return pd.DataFrame(self.normalizer.transform(transformed_x), columns=self.fit_cols, index=x.index)[self.cols]
+
 
 if __name__ == "__main__":
-    df = pd.DataFrame([[1, 2], [1, np.nan]])
+    df = pd.DataFrame([[3, 2], [1, np.nan]])
     model = PreprocessingModel()
     model.fit_transform(df)
