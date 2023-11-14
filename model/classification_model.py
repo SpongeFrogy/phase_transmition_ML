@@ -71,13 +71,13 @@ class ClassifierModel:
                    "LGM":      {"max_depth": hp.choice('max_depth', np.arange(2, 10+1, dtype=int)),
                                 "n_estimators":  hp.choice('n_estimators', np.arange(40, 100+1, dtype=int)),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                "reg_lambda": hp.uniform("reg_lambda", 0.01, 10),
+                                "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
                                 },
 
                    "XGB":      {"max_depth": hp.choice('max_depth', list(range(40, 100))),
                                 "n_estimators":  hp.choice('n_estimators', np.arange(40, 100+1, dtype=int)),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                "reg_lambda": hp.uniform("reg_lambda", 0.01, 10),
+                                "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
                                 },
 
                    "RF":       {"max_depth": hp.choice('max_depth', np.arange(10, 100+1, dtype=int)),

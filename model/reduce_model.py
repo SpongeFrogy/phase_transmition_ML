@@ -46,28 +46,30 @@ class AE(nn.Module):
         "RMSE": RMSE
     }
 
-    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5), last_activation: Callable = nn.LeakyReLU()):
+    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5), last_activation: Callable = nn.ReLU()):
         """AE model
 
         Args:
             layers (Tuple[int], optional): sizes of layers. Defaults to (1145, 572, 286, 143, 72, 36, 18, 9, 5).
-            last_activation (Callable, optional): last activation function for decoder. Defaults to nn.LeakyReLU().
+            last_activation (Callable, optional): last activation function for decoder. Defaults to nn.ReLU().
         """
 
         super(AE, self).__init__()
 
         self.layers = layers
         self.encoder = nn.Sequential()
-        for i in range(len(layers)-1):
+        for i in range(len(layers)-2):
             self.encoder.append(nn.Linear(layers[i], layers[i+1]))
             # url https://datascience.stackexchange.com/questions/5706/what-is-the-dying-relu-problem-in-neural-networks
-            # this why LeakyReLU
-            self.encoder.append(nn.LeakyReLU())
+            # this why ReLU
+            self.encoder.append(nn.ReLU())
+        
+        self.encoder.append(nn.Linear(layers[-2], layers[-1]))
 
         self.decoder = nn.Sequential()
         for i in range(len(layers)-1, 0, -1):
             self.decoder.append(nn.Linear(layers[i], layers[i-1]))
-            self.decoder.append(nn.LeakyReLU())
+            self.decoder.append(nn.ReLU())
         self.decoder[-1] = last_activation
 
     def forward(self, x):
@@ -377,7 +379,7 @@ def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[Te
 
 
 class ReduceModel:
-    train_set, test_set = load_data(scale="normalizer")
+    train_set, test_set = load_data(scale="minmax")
     dataset = torch.cat(
         (*train_set.tensors, *test_set.tensors)).to(torch.device("cuda"))
 
