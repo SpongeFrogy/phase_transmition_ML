@@ -157,18 +157,16 @@ class ClassifierModel:
                 for value, count in zip(*np.unique(y_cv_train, return_counts=True)):
                     balance["train"][str(value)] = count
 
-                def hyperopt_objective(params):
-                    _model = deepcopy(clf_model).set_params(**params)
-                    _model.fit(x_cv_train, y_cv_train)
-                    y_cv_pred = _model.predict(x_cv_test)
-                    m_value = metrics.f1_score(
-                        y_cv_test, y_cv_pred, average="macro")
-
-                    return -m_value
-
                 best = fmin(
-                    hyperopt_objective, space=self.h_space_clf[clf_name], algo=tpe.suggest, timeout=time_per_clf, return_argmin=False)
-                score = -hyperopt_objective(best)
+                                fn=lambda params: hyperopt_objective(params, clf_model, x_cv_train, y_cv_train, x_cv_test, y_cv_test),
+                                space=self.h_space_clf[clf_name],
+                                algo=tpe.suggest,
+                                timeout=time_per_clf,
+                                return_argmin=False
+                            )
+
+                score = -hyperopt_objective(best, clf_model, x_cv_train, y_cv_train, x_cv_test, y_cv_test)
+
 
                 if score > cv_res[clf_name]["score"]:
                     cv_res[clf_name] = best
@@ -186,9 +184,17 @@ class ClassifierModel:
         for name in self.models:
             self.models[name].set_params(**params[name])
 
+def hyperopt_objective(params, model, x_train, y_train, x_test, y_test):
+    _model = deepcopy(model).set_params(**params)
+    _model.fit(x_train, y_train)
+    y_pred = _model.predict(x_test)
+    metric_value = metrics.f1_score(y_test, y_pred, average="macro")
+    return -metric_value
+
 
 if __name__ == "__main__":
     c_model = ClassifierModel()
     x = DataFrame(np.random.random((100, 5)))
     y = DataFrame(np.random.randint(0, 2, 100))
     c_model.cv(x, y)
+    
