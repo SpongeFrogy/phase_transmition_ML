@@ -72,9 +72,10 @@ class ClassifierModel:
                                 "n_estimators":  hp.choice('n_estimators', np.arange(40, 100+1, dtype=int)),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
                                 "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
+                                "subsample": hp.uniform("subsample", 1e-5, 1)
                                 },
 
-                   "XGB":      {"max_depth": hp.choice('max_depth', list(range(40, 100))),
+                   "XGB":      {"max_depth": hp.choice('max_depth', list(range(2, 10))),
                                 "n_estimators":  hp.choice('n_estimators', np.arange(40, 100+1, dtype=int)),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
                                 "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
@@ -188,7 +189,8 @@ def hyperopt_objective(params, model, x_train, y_train, x_test, y_test):
     _model = deepcopy(model).set_params(**params)
     _model.fit(x_train, y_train)
     y_pred = _model.predict(x_test)
-    metric_value = metrics.f1_score(y_test, y_pred, average="macro")
+    counts = {t[0]: t[1] for t in zip(*np.unique(y_test, return_counts=True))}
+    metric_value = (metrics.f1_score(y_test, y_pred, pos_label=1)/counts[1] + metrics.f1_score(y_test, y_pred, pos_label=0)/counts[0]) / (1/counts[0] + 1/counts[1])
     return -metric_value
 
 

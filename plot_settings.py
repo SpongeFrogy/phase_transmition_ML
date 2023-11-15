@@ -28,7 +28,7 @@ def ide_plot():
     plt.rcParams["legend.labelcolor"] = 'w'
     plt.rcParams["axes.titlecolor"] = "w"
 
-    plt.rcParams['axes.prop_cycle'] = cycler(color=['g', 'r', 'b', 'y'])
+    plt.rcParams['axes.prop_cycle'] = cycler(color=['g', 'r', 'b', 'y', 'purple'])
 
 def pres_plot():
     """plot settings for presentation theme

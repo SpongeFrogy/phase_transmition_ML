@@ -326,7 +326,7 @@ class VAE(nn.Module):
                 print(f'Epoch {epoch+1}, Validation Loss: {val_loss}')
                 test_loss_list[epoch] = val_loss
 
-        train_results = {"model": "AE",
+        train_results = {"model": "VAE",
                          "epochs": epochs,
                          "learning_rate": lr,
                          "batch_size": batch_size,
@@ -398,7 +398,14 @@ class ReduceModel:
         
         self.trained = False
         self.device = get_cuda()
-        self.model = AE(**params).to(self.device)
+
+        match model:
+            case "AE":
+                self.model = AE(**params).to(self.device)
+            case "VAE":
+                self.model = VAE(**params).to(self.device)
+            case _:
+                raise ValueError(f"no model {model} found")
 
     def train(self, epochs: int, lr: float = 1e-3, batch_size: int = 128, loss_func: Literal['MSE', 'RMSE', "BCE"] = "MSE", **kwargs) -> None:
         """train encoder 
