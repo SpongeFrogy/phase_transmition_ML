@@ -25,6 +25,8 @@ from sklearn import metrics
 
 import numpy as np
 
+from model.reduce_model import ReduceModel
+
 
 class TrainError(Exception):
     "if models are nor fitted"
@@ -63,25 +65,25 @@ class ClassifierModel:
                 }
 
     h_space_clf = {"CatBoost": {"depth": hp.uniformint("depth", 2, 10),
-                                "n_estimators": hp.uniformint("n_estimators", 40, 100),
+                                "n_estimators": hp.uniformint("n_estimators", 10, 60),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                "l2_leaf_reg": hp.uniform("l2_leaf_reg", 0.01, 10),
+                                "l2_leaf_reg": hp.uniform("l2_leaf_reg", 0., 1.),
                                 },
 
                    "LGM":      {"max_depth": hp.choice('max_depth', np.arange(2, 10+1, dtype=int)),
-                                "n_estimators":  hp.choice('n_estimators', np.arange(40, 100+1, dtype=int)),
+                                "n_estimators":  hp.choice('n_estimators', np.arange(10, 60+1, dtype=int)),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
                                 "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
                                 "subsample": hp.uniform("subsample", 1e-5, 1)
                                 },
 
                    "XGB":      {"max_depth": hp.choice('max_depth', list(range(2, 10))),
-                                "n_estimators":  hp.choice('n_estimators', np.arange(40, 100+1, dtype=int)),
+                                "n_estimators":  hp.choice('n_estimators', np.arange(10, 60+1, dtype=int)),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
                                 "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
                                 },
 
-                   "RF":       {"max_depth": hp.choice('max_depth', np.arange(10, 100+1, dtype=int)),
+                   "RF":       {"max_depth": hp.choice('max_depth', np.arange(10, 20+1, dtype=int)),
                                 "n_estimators":  hp.choice('n_estimators', list(range(40, 100+1))),
                                 },
 
@@ -89,6 +91,12 @@ class ClassifierModel:
                                 "n_estimators": hp.choice('n_estimators', list(range(40, 100+1))),
                                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
                                 }}
+
+    @staticmethod
+    def score(y_true, y_pred) -> float:
+        n_1 = len(y_true[y_true == 1])
+        n_0 = len(y_true[y_true == 0])
+        return (metrics.f1_score(y_true, y_pred, pos_label=1)/n_1 + metrics.f1_score(y_true, y_pred, pos_label=0)/n_0) / (1/n_1 + 1/n_0)
 
     def __init__(self) -> None:
 
@@ -159,15 +167,17 @@ class ClassifierModel:
                     balance["train"][str(value)] = count
 
                 best = fmin(
-                                fn=lambda params: hyperopt_objective(params, clf_model, x_cv_train, y_cv_train, x_cv_test, y_cv_test),
-                                space=self.h_space_clf[clf_name],
-                                algo=tpe.suggest,
-                                timeout=time_per_clf,
-                                return_argmin=False
-                            )
+                    fn=lambda params: hyperopt_objective(
+                        params, clf_model, x_cv_train, y_cv_train, x_cv_test, y_cv_test),
+                    space=self.h_space_clf[clf_name],
+                    algo=tpe.suggest,
+                    timeout=time_per_clf,
+                    return_argmin=False
+                )
 
-                score = -hyperopt_objective(best, clf_model, x_cv_train, y_cv_train, x_cv_test, y_cv_test)
-
+                score = - \
+                    hyperopt_objective(
+                        best, clf_model, x_cv_train, y_cv_train, x_cv_test, y_cv_test)
 
                 if score > cv_res[clf_name]["score"]:
                     cv_res[clf_name] = best
@@ -185,12 +195,13 @@ class ClassifierModel:
         for name in self.models:
             self.models[name].set_params(**params[name])
 
+
 def hyperopt_objective(params, model, x_train, y_train, x_test, y_test):
     _model = deepcopy(model).set_params(**params)
     _model.fit(x_train, y_train)
     y_pred = _model.predict(x_test)
-    counts = {t[0]: t[1] for t in zip(*np.unique(y_test, return_counts=True))}
-    metric_value = (metrics.f1_score(y_test, y_pred, pos_label=1)/counts[1] + metrics.f1_score(y_test, y_pred, pos_label=0)/counts[0]) / (1/counts[0] + 1/counts[1])
+    #counts = {t[0]: t[1] for t in zip(*np.unique(y_test, return_counts=True))}
+    metric_value = ClassifierModel.score(y_test, y_pred)
     return -metric_value
 
 
@@ -199,4 +210,3 @@ if __name__ == "__main__":
     x = DataFrame(np.random.random((100, 5)))
     y = DataFrame(np.random.randint(0, 2, 100))
     c_model.cv(x, y)
-    
