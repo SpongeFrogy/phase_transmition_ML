@@ -3,6 +3,7 @@ from re import L
 from typing import Callable, Dict, Tuple, Literal, Union
 
 import torch
+import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset
 import pandas as pd
 import numpy as np
@@ -16,6 +17,19 @@ from sklearn.decomposition import PCA
 
 from tqdm import tqdm
 import os
+
+
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+
+
+g = torch.Generator()
+g.manual_seed(0)
+
+torch.manual_seed(42)
+torch.cuda.manual_seed_all(42)
+
 
 class TrainError(Exception):
     "encoder in ReduceModel isn't trained yet"
@@ -40,6 +54,8 @@ def RMSE(y_recon, y):
 
 
 "standard layers: 1378, 702, 351, 176, 88, 44, 22, 11, 5"
+
+
 class AE(nn.Module):
     losses = {
         "MSE": nn.MSELoss(),
@@ -63,7 +79,7 @@ class AE(nn.Module):
             # url https://datascience.stackexchange.com/questions/5706/what-is-the-dying-relu-problem-in-neural-networks
             # this why ReLU
             self.encoder.append(nn.ReLU())
-        
+
         self.encoder.append(nn.Linear(layers[-2], layers[-1]))
 
         self.decoder = nn.Sequential()
@@ -97,9 +113,12 @@ class AE(nn.Module):
         device = get_cuda()
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         criterion = self.losses[loss_func]
+        scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.5, total_iters=30)
 
-        train_loader = DataLoader(train_set, batch_size=batch_size)
-        val_loader = DataLoader(test_set, batch_size=batch_size)
+        train_loader = DataLoader(train_set, batch_size=batch_size, worker_init_fn=seed_worker,
+                                  generator=g)
+        val_loader = DataLoader(test_set, batch_size=batch_size, worker_init_fn=seed_worker,
+                                generator=g)
 
         # storage for loss
         train_loss_list = [None]*epochs
@@ -126,7 +145,7 @@ class AE(nn.Module):
             train_loss /= train_loader.__len__()
 
             train_loss_list[epoch] = train_loss
-
+            scheduler.step()
             # Validation loop
             val_loss = 0.
             self.eval()
@@ -137,22 +156,6 @@ class AE(nn.Module):
                     outputs = self(inputs)
                     loss = criterion(outputs, inputs)
                     val_loss += loss.item()
-
-                # * if we what to plot latent space per epoch
-                # if epoch % 100 == 0:
-                    # plot latent space
-                    # x_encoded = self.model.encoder(self.dataset).cpu().detach().numpy()
-                    # pd.DataFrame(x_encoded).hist(bins=80)
-                    # plt.show()
-                    # x_pca = PCA(n_components=2).fit_transform(x_encoded)
-                    # x_tsne = TSNE(n_components=2).fit_transform(x_encoded)
-                    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-
-                    # ax1.scatter(x_pca[:,0], x_pca[:,1])
-                    # ax1.set_title("PCA")
-                    # ax2.scatter(x_tsne[:,0], x_tsne[:,1])
-                    # ax2.set_title("TSNE")
-                    # plt.show()
 
                 val_loss /= len(val_loader)
 
@@ -186,6 +189,22 @@ class AE(nn.Module):
 
         return self.encoder(x)
 
+
+                # * if we what to plot latent space per epoch
+                # if epoch % 100 == 0:
+                    # plot latent space
+                    # x_encoded = self.model.encoder(self.dataset).cpu().detach().numpy()
+                    # pd.DataFrame(x_encoded).hist(bins=80)
+                    # plt.show()
+                    # x_pca = PCA(n_components=2).fit_transform(x_encoded)
+                    # x_tsne = TSNE(n_components=2).fit_transform(x_encoded)
+                    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+
+                    # ax1.scatter(x_pca[:,0], x_pca[:,1])
+                    # ax1.set_title("PCA")
+                    # ax2.scatter(x_tsne[:,0], x_tsne[:,1])
+                    # ax2.set_title("TSNE")
+                    # plt.show()
 
 # def loss_function(recon_x, x, mu, logvar, beta: float = 0.5,  recon_loss: Literal["MSE", "BCE"] = "BCE"):
 #     BCE = F.binary_cross_entropy(recon_x, x.view(-1, 1384))
@@ -328,7 +347,7 @@ class VAE(nn.Module):
                 print(f'Epoch {epoch+1}, Validation Loss: {val_loss}')
                 test_loss_list[epoch] = val_loss
 
-        train_results = {"model": "AE",
+        train_results = {"model": "VAE",
                          "epochs": epochs,
                          "learning_rate": lr,
                          "batch_size": batch_size,
@@ -369,9 +388,9 @@ def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[Te
             break
         else:
             path.pop(i)
-    
-    path_train = "/".join(path) + f"/qmof_datasets/normalizer/small_train.csv"
-    path_test = "/".join(path) + f"/qmof_datasets/normalizer/small_test.csv"
+
+    path_train = "/".join(path) + f"/qmof_datasets/train.csv"
+    path_test = "/".join(path) + f"/qmof_datasets/test.csv"
     train = TensorDataset(torch.tensor(pd.read_csv(
         path_train, index_col=0).values, dtype=torch.float32))
     test = TensorDataset(torch.tensor(pd.read_csv(
@@ -399,10 +418,17 @@ class ReduceModel:
             params are params of nn model class
 
         """
-        
+
         self.trained = False
         self.device = get_cuda()
-        self.model = AE(**params).to(self.device)
+
+        match model:
+            case "AE":
+                self.model = AE(**params).to(self.device)
+            case "VAE":
+                self.model = VAE(**params).to(self.device)
+            case _:
+                raise ValueError(f"no model {model} found")
 
     def train(self, epochs: int, lr: float = 1e-3, batch_size: int = 128, loss_func: Literal['MSE', 'RMSE', "BCE"] = "MSE", **kwargs) -> None:
         """train encoder 

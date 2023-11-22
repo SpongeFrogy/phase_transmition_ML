@@ -8,5 +8,6 @@
 - [Reduce](model/reduce_model.py) - Autoencoder and Variational Autoencoder models used for reducing number of features
   - [Reduce analysis](model/reduce_analysis.ipynb)
 - [Classification model](model/classification_model.py) - model used for classification
+- [Full pipeline](pipeline.ipynb)
 
 for next workflow i use [this article](https://habr.com/ru/articles/106912/)
