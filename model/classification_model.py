@@ -205,8 +205,8 @@ def hyperopt_objective(params, model, x_train, y_train, x_test, y_test):
     return -metric_value
 
 
-if __name__ == "__main__":
-    c_model = ClassifierModel()
-    x = DataFrame(np.random.random((100, 5)))
-    y = DataFrame(np.random.randint(0, 2, 100))
-    c_model.cv(x, y)
+# if __name__ == "__main__":
+#     c_model = ClassifierModel()
+#     x = DataFrame(np.random.random((100, 5)))
+#     y = DataFrame(np.random.randint(0, 2, 100))
+#     c_model.cv(x, y)

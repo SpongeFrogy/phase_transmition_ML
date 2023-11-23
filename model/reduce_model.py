@@ -389,8 +389,8 @@ def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[Te
         else:
             path.pop(i)
 
-    path_train = "/".join(path) + f"/qmof_datasets/train.csv"
-    path_test = "/".join(path) + f"/qmof_datasets/test.csv"
+    path_train = "/".join(path) + f"/qmof_datasets/small_train.csv"
+    path_test = "/".join(path) + f"/qmof_datasets/small_test.csv"
     train = TensorDataset(torch.tensor(pd.read_csv(
         path_train, index_col=0).values, dtype=torch.float32))
     test = TensorDataset(torch.tensor(pd.read_csv(
@@ -489,11 +489,20 @@ class ReduceModel:
         x_reduced = self.model._transform(x_torch)
 
         return x_reduced.cpu().detach().numpy()
+    
+    def load_model(self, path: str, device: torch.device = get_cuda()):
+        """load model from path
+
+        Args:
+            path (str): path to model weights .pkl file
+        """
+        self.model = torch.load(path,  map_location=device)
+        self.trained = True
 
 
-if __name__ == "__main__":
-    # (1145, 572, 286, 143, 72, 36, 18, 9, 5)
-    model = ReduceModel(AE())
-    model.train(500, lr=1e-3, batch_size=2048, loss_func="MSE")
-    model.transform(model.train_set.tensors[0])
-    model.plot_loss()
+# if __name__ == "__main__":
+#     # (1145, 572, 286, 143, 72, 36, 18, 9, 5)
+#     model = ReduceModel(AE())
+#     model.train(500, lr=1e-3, batch_size=2048, loss_func="MSE")
+#     model.transform(model.train_set.tensors[0])
+#     model.plot_loss()
