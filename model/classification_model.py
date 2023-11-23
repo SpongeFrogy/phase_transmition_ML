@@ -13,6 +13,8 @@ from sklearn.metrics import balanced_accuracy_score
 from xgboost import XGBClassifier
 
 from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.neighbors import KNeighborsClassifier
+
 
 from sklearn.tree import DecisionTreeClassifier
 
@@ -26,6 +28,7 @@ from sklearn import metrics
 import numpy as np
 
 from model.reduce_model import ReduceModel
+from imblearn.over_sampling import SMOTE
 
 
 class TrainError(Exception):
@@ -58,39 +61,41 @@ from imblearn.over_sampling import RandomOverSampler, SMOTE, ADASYN
 
 class ClassifierModel:
     clf_dict = {"CatBoost": CatBoostClassifier(random_seed=42, silent=True),
-                "LGM": LGBMClassifier(random_seed=42),
-                "XGB": XGBClassifier(),
+                # "LGM": LGBMClassifier(random_seed=42),
+                # "XGB": XGBClassifier(),
                 "RF": RandomForestClassifier(random_state=42),
-                "AdaBoost": AdaBoostClf(random_state=42)
+                "AdaBoost": AdaBoostClf(random_state=42), 
+                "Knn": KNeighborsClassifier(weights="distance", p=2)
                 }
 
-    h_space_clf = {"CatBoost": {"depth": hp.uniformint("depth", 2, 10),
-                                "n_estimators": hp.uniformint("n_estimators", 10, 60),
-                                "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                "l2_leaf_reg": hp.uniform("l2_leaf_reg", 0., 1.),
+    h_space_clf = {"CatBoost": {"depth": hp.uniformint("depth", 4, 12),
+                                "n_estimators": hp.uniformint("n_estimators", 30, 60),
+                                "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-3)),
+                                "l2_leaf_reg": hp.uniform("l2_leaf_reg", 01e-5, 0.4),
                                 },
 
-                   "LGM":      {"max_depth": hp.choice('max_depth', np.arange(2, 10+1, dtype=int)),
-                                "n_estimators":  hp.choice('n_estimators', np.arange(10, 60+1, dtype=int)),
-                                "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
-                                "subsample": hp.uniform("subsample", 1e-5, 1)
-                                },
+                #    "LGM":      {"max_depth": hp.choice('max_depth', np.arange(4, 12+1, dtype=int)),
+                #                 "n_estimators":  hp.choice('n_estimators', np.arange(30, 60+1, dtype=int)),
+                #                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-3)),
+                #                 "reg_lambda": hp.uniform("reg_lambda", 01e-5, 0.4),
+                #                 "subsample": hp.uniform("subsample", 1e-5, 1)
+                #                 },
 
-                   "XGB":      {"max_depth": hp.choice('max_depth', list(range(2, 10))),
-                                "n_estimators":  hp.choice('n_estimators', np.arange(10, 60+1, dtype=int)),
-                                "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                "reg_lambda": hp.uniform("reg_lambda", 0.01, 1),
-                                },
+                #    "XGB":      {"max_depth": hp.choice('max_depth', list(range(4, 12))),
+                #                 "n_estimators":  hp.choice('n_estimators', np.arange(20, 30+1, dtype=int)),
+                #                 "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-3)),
+                #                 "reg_lambda": hp.uniform("reg_lambda", 01e-5, 0.4),
+                #                 },
 
                    "RF":       {"max_depth": hp.choice('max_depth', np.arange(10, 20+1, dtype=int)),
                                 "n_estimators":  hp.choice('n_estimators', list(range(40, 100+1))),
                                 },
 
-                   "AdaBoost": {"max_depth": hp.choice('max_depth', list(range(2, 10+1))),
-                                "n_estimators": hp.choice('n_estimators', list(range(40, 100+1))),
-                                "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-2)),
-                                }}
+                   "AdaBoost": {"max_depth": hp.choice('max_depth', list(range(4, 12+1))),
+                                "n_estimators": hp.choice('n_estimators', list(range(40, 60+1))),
+                                "learning_rate": hp.loguniform("learning_rate", np.log(1e-5), np.log(1e-3)),
+                                },
+                   "Knn": {"n_neighbors": hp.choice("n_neighbors", [3, 4, 5, 6, 7])}}
 
     @staticmethod
     def score(y_true, y_pred) -> float:
@@ -152,6 +157,7 @@ class ClassifierModel:
 
         for clf_name in self.models:
             print(f"evaluate {clf_name}")
+            stats = {par: [] for par in self.h_space_clf[clf_name].keys()}
             for i, (train_index, test_index) in enumerate(skf.split(X_train, y_train)):
                 x_cv_train, y_cv_train = X_train.iloc[train_index], y_train.iloc[train_index].values.ravel(
                 )
@@ -174,6 +180,8 @@ class ClassifierModel:
                     timeout=time_per_clf,
                     return_argmin=False
                 )
+                for b_par in best:
+                    stats[b_par].append(best[b_par])
 
                 score = - \
                     hyperopt_objective(
@@ -183,6 +191,8 @@ class ClassifierModel:
                     cv_res[clf_name] = best
                     cv_res[clf_name]["score"] = score
                     cv_res[clf_name]["balance"] = balance
+            for par in stats:
+                print(f"best {par} ber folds:", stats[par])
 
         return cv_res
 

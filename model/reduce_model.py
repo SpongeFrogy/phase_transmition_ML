@@ -55,20 +55,8 @@ def RMSE(y_recon, y):
 
 "standard layers: 1378, 702, 351, 176, 88, 44, 22, 11, 5"
 
-
-class AE(nn.Module):
-    losses = {
-        "MSE": nn.MSELoss(),
-        "RMSE": RMSE
-    }
-
-    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5), last_activation: Callable = nn.ReLU()):
-        """AE model
-
-        Args:
-            layers (Tuple[int], optional): sizes of layers. Defaults to (1145, 572, 286, 143, 72, 36, 18, 9, 5).
-            last_activation (Callable, optional): last activation function for decoder. Defaults to nn.ReLU().
-        """
+"""
+def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5)):
 
         super(AE, self).__init__()
 
@@ -81,12 +69,46 @@ class AE(nn.Module):
             self.encoder.append(nn.ReLU())
 
         self.encoder.append(nn.Linear(layers[-2], layers[-1]))
-
         self.decoder = nn.Sequential()
-        for i in range(len(layers)-1, 0, -1):
+        for i in range(len(layers)-1, 1, -1):
             self.decoder.append(nn.Linear(layers[i], layers[i-1]))
             self.decoder.append(nn.ReLU())
-        self.decoder[-1] = last_activation
+        self.decoder.append(nn.Linear(layers[1], layers[0]))
+"""
+
+class AE(nn.Module):
+    losses = {
+        "MSE": nn.MSELoss(),
+        "RMSE": RMSE
+    }
+    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5), activation: Callable = nn.Sigmoid()):
+        """AE model
+
+        Args:
+            layers (Tuple[int], optional): sizes of layers. Defaults to (1145, 572, 286, 143, 72, 36, 18, 9, 5).
+            activation (Callable, optional): activation function for decoder. Defaults to nn.ReLU().
+        """
+
+        super(AE, self).__init__()
+
+        self.layers = layers
+        self.encoder = nn.Sequential()
+        for i in range(len(layers)-2):
+            self.encoder.append(nn.Linear(layers[i], layers[i+1]))
+            # url https://datascience.stackexchange.com/questions/5706/what-is-the-dying-relu-problem-in-neural-networks
+            # this why ReLU
+            self.encoder.append(activation)
+
+        self.encoder.append(nn.Linear(layers[-2], layers[-1]))
+
+        self.decoder = nn.Sequential()
+        for i in range(len(layers)-1, 1, -1):
+            self.decoder.append(nn.Linear(layers[i], layers[i-1]))
+            self.decoder.append(activation)
+        self.decoder.append(nn.Linear(layers[1], layers[0]))
+
+        print(self.encoder)
+        print(self.decoder)
 
     def forward(self, x):
         x = self.encoder(x)
@@ -217,14 +239,14 @@ class VAE(nn.Module):
 
     @classmethod
     def KLD(cls, mu, logvar, beta=0.5):
-        return - beta * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        return - beta * torch.sum(1 + logvar - mu.pow(2) - logvar.exp().pow(2))
 
-    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 55), last_activation: Callable = nn.LeakyReLU()):
+    def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9)):
         """VAE model
 
         Args:
             layers (Tuple[int], optional): sizes of layers. Defaults to (1145, 572, 286, 143, 72, 36, 18, 9, 55).
-            last_activation (Callable, optional): last activation function for decoder. Defaults to nn.LeakyReLU().
+            last_activation (Callable, optional): last activation function for decoder. Defaults to nn.ReLU().
         """
         super(VAE, self).__init__()
 
@@ -233,21 +255,24 @@ class VAE(nn.Module):
         for i in range(len(layers)-2):
             self.encoder.append(nn.Linear(layers[i], layers[i+1]))
             # url https://datascience.stackexchange.com/questions/5706/what-is-the-dying-relu-problem-in-neural-networks
-            # this why LeakyReLU
-            self.encoder.append(nn.LeakyReLU())
+            # this why ReLU
+            self.encoder.append(nn.Sigmoid())
+            self.encoder.append(nn.Dropout(0.2))
 
         self.decoder = nn.Sequential()
-        for i in range(len(layers)-1, 0, -1):
+        for i in range(len(layers)-1, 1, -1):
             self.decoder.append(nn.Linear(layers[i], layers[i-1]))
-            self.decoder.append(nn.LeakyReLU())
-        self.decoder[-1] = last_activation
+            self.decoder.append(nn.Sigmoid())
+        self.decoder.append(nn.Linear(layers[1], layers[0]))
 
         self.fc1 = nn.Linear(layers[-2], layers[-1])
         self.fc2 = nn.Linear(layers[-2], layers[-1])
         self.trained = False
+        print(self.encoder)
+        print(self.decoder)
 
     def encode(self, x):
-        h = F.relu(self.encoder(x))
+        h = self.encoder(x)
         return self.fc1(h), self.fc2(h)
 
     def reparameterize(self, mu, logvar):
@@ -289,6 +314,7 @@ class VAE(nn.Module):
         # storage for loss
         train_loss_list = [None]*epochs
         test_loss_list = [None]*epochs
+        test_train_loss_list = [None]*epochs
 
         for epoch in range(epochs):
             self.train()
@@ -316,6 +342,7 @@ class VAE(nn.Module):
 
             # Validation loop
             val_loss = 0.
+            val_train_loss = 0.
             self.eval()
             with torch.no_grad():
                 for data in val_loader:
@@ -324,6 +351,14 @@ class VAE(nn.Module):
                     outputs, mu, logvar = self(inputs)
                     loss = criterion(outputs, inputs, mu, logvar)
                     val_loss += loss.item()
+
+            with torch.no_grad():
+                for data in train_loader:
+                    inputs, = data
+                    inputs = inputs.to(device)
+                    outputs, mu, logvar = self(inputs)
+                    loss = criterion(outputs, inputs, mu, logvar)
+                    val_train_loss += loss.item()
 
                 # * if we what to plot latent space per epoch
                 # if epoch % 100 == 0:
@@ -345,6 +380,10 @@ class VAE(nn.Module):
                 print(f'Epoch {epoch+1}, Validation Loss: {val_loss}')
                 test_loss_list[epoch] = val_loss
 
+                val_train_loss /= len(train_loader)
+                print(f'Epoch {epoch+1}, Train after train Loss: {val_train_loss}')
+                test_train_loss_list[epoch] = val_train_loss
+
         train_results = {"model": "VAE",
                          "epochs": epochs,
                          "learning_rate": lr,
@@ -354,7 +393,8 @@ class VAE(nn.Module):
                          "train_loss": train_loss_list[-1],
                          "test_loss": test_loss_list[-1],
                          "train_loss_list": train_loss_list,
-                         "test_loss_list": test_loss_list}
+                         "test_loss_list": test_loss_list,
+                         "test_train_loss_list": test_train_loss_list}
 
         return train_results
 
