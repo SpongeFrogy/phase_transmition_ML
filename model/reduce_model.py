@@ -389,8 +389,8 @@ def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[Te
         else:
             path.pop(i)
 
-    path_train = "/".join(path) + f"/qmof_datasets/small_train.csv"
-    path_test = "/".join(path) + f"/qmof_datasets/small_test.csv"
+    path_train = "/".join(path) + f"/qmof_datasets/train.csv"
+    path_test = "/".join(path) + f"/qmof_datasets/test.csv"
     train = TensorDataset(torch.tensor(pd.read_csv(
         path_train, index_col=0).values, dtype=torch.float32))
     test = TensorDataset(torch.tensor(pd.read_csv(
