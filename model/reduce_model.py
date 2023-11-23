@@ -131,7 +131,8 @@ class AE(nn.Module):
             Dict[str, object]: dict with hyper params and train/test losses  
         """
 
-        device = torch.device("cuda")
+        # device = torch.device("cuda")
+        device = get_cuda()
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         criterion = self.losses[loss_func]
         scheduler = lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=0.5, total_iters=30)
@@ -302,7 +303,8 @@ class VAE(nn.Module):
         """
 
         self.beta = beta
-        device = torch.device("cuda")
+        # device = torch.device("cuda")
+        device = get_cuda()
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
 
         def criterion(x_recon, x, mu, logvar) -> float:
@@ -438,9 +440,11 @@ def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[Te
 
 
 class ReduceModel:
+    device = get_cuda()
     train_set, test_set = load_data(scale="minmax")
+    # Device and dataset либо в конструктор запихнуть либо только тут оставить 
     dataset = torch.cat(
-        (*train_set.tensors, *test_set.tensors)).to(torch.device("cuda"))
+        (*train_set.tensors, *test_set.tensors)).to(device=device)
 
     def check_is_trained(self):
         if not self.trained:
