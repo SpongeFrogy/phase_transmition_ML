@@ -240,7 +240,7 @@ class VAE(nn.Module):
 
     @classmethod
     def KLD(cls, mu, logvar, beta=0.5):
-        return - beta * torch.sum(1 + logvar - mu.pow(2) - logvar.exp().pow(2))
+        return - beta * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 
     def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9)):
         """VAE model
@@ -409,7 +409,7 @@ class VAE(nn.Module):
         Returns:
             np.ndarray: reduced x
         """
-        return self.encode(x)[0]
+        return self.reparameterize(*self.encode(x))
 
 
 def load_data(scale: Literal["minmax", "normalizer"] = "normalizer") -> Tuple[TensorDataset, TensorDataset]:
