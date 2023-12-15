@@ -79,7 +79,7 @@ def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5))
 class AE(nn.Module):
     losses = {
         "MSE": nn.MSELoss(),
-        "RMSE": RMSE
+        "RMSE": RMSE,
     }
     def __init__(self, layers: Tuple[int] = (1145, 572, 286, 143, 72, 36, 18, 9, 5), activation: Callable = nn.Sigmoid()):
         """AE model
