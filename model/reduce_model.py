@@ -145,6 +145,7 @@ class AE(nn.Module):
         # storage for loss
         train_loss_list = [None]*epochs
         test_loss_list = [None]*epochs
+        mape_list = [None]*epochs
 
         for epoch in tqdm(range(epochs)):
             self.train()
@@ -170,6 +171,7 @@ class AE(nn.Module):
             scheduler.step()
             # Validation loop
             val_loss = 0.
+            mape_loss = 0.
             self.eval()
             with torch.no_grad():
                 for data in val_loader:
